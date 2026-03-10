@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Hintergrund-Gradient: exakt wie Generic-Icon (hellblau → dunkelviolett) -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#6eb4f7"/>
+      <stop offset="100%" stop-color="#3a3fa8"/>
+    </linearGradient>
+
+    <!-- Gradient für die Ladesäule (weiß-transparent für Tiefe) -->
+    <linearGradient id="pillarGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#c8d8f0" stop-opacity="0.85"/>
+    </linearGradient>
+
+    <!-- Schatten -->
+    <filter id="shadow" x="-15%" y="-10%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#1a1f6e" flood-opacity="0.35"/>
+    </filter>
+
+    <!-- Blitz-Gradient (gelb-orange) -->
+    <linearGradient id="boltGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ── Hintergrund ── -->
+  <rect width="512" height="512" rx="108" ry="108" fill="url(#bgGrad)"/>
+
+  <!-- ── Ladesäule: Hauptgehäuse ── -->
+  <rect x="174" y="108" width="164" height="272"
+        rx="26" ry="26"
+        fill="url(#pillarGrad)"
+        filter="url(#shadow)"/>
+
+  <!-- Gehäuse: rechte Seite dunkler (Tiefenwirkung) -->
+  <rect x="296" y="108" width="42" height="272"
+        rx="26" ry="26"
+        fill="#1a2f70" opacity="0.18"/>
+
+  <!-- ── Display-Fläche ── -->
+  <rect x="196" y="132" width="120" height="88"
+        rx="12" ry="12"
+        fill="#1e3a8a" opacity="0.82"/>
+
+  <!-- ── Blitz-Symbol im Display ── -->
+  <polygon points="272,148  248,183  264,183  240,218  276,180  258,180  276,148"
+           fill="url(#boltGrad)"/>
+
+  <!-- ── Kabel-Anschluss-Leiste ── -->
+  <rect x="188" y="236" width="136" height="52"
+        rx="10" ry="10"
+        fill="#1e3a8a" opacity="0.55"/>
+
+  <!-- Anschluss-Punkte (2 Buchsen) -->
+  <circle cx="232" cy="262" r="13" fill="#0f172a" opacity="0.7"/>
+  <circle cx="280" cy="262" r="13" fill="#0f172a" opacity="0.7"/>
+  <circle cx="232" cy="262" r="6"  fill="#3b82f6" opacity="0.9"/>
+  <circle cx="280" cy="262" r="6"  fill="#3b82f6" opacity="0.9"/>
+
+  <!-- ── Kabel links ── -->
+  <path d="M 214 288 C 200 320 168 340 150 385"
+        stroke="#1e3a8a" stroke-width="11" stroke-opacity="0.7"
+        fill="none" stroke-linecap="round"/>
+  <!-- Stecker links -->
+  <rect x="131" y="382" width="38" height="26" rx="7" ry="7"
+        fill="#1e3a8a" opacity="0.85"/>
+  <rect x="140" y="372" width="9"  height="14" rx="3" ry="3" fill="#0f172a" opacity="0.8"/>
+  <rect x="153" y="372" width="9"  height="14" rx="3" ry="3" fill="#0f172a" opacity="0.8"/>
+
+  <!-- ── Kabel rechts ── -->
+  <path d="M 298 288 C 312 320 344 340 362 385"
+        stroke="#1e3a8a" stroke-width="11" stroke-opacity="0.7"
+        fill="none" stroke-linecap="round"/>
+  <!-- Stecker rechts -->
+  <rect x="343" y="382" width="38" height="26" rx="7" ry="7"
+        fill="#1e3a8a" opacity="0.85"/>
+  <rect x="352" y="372" width="9"  height="14" rx="3" ry="3" fill="#0f172a" opacity="0.8"/>
+  <rect x="365" y="372" width="9"  height="14" rx="3" ry="3" fill="#0f172a" opacity="0.8"/>
+
+  <!-- ── Bodenplatte / Sockel ── -->
+  <rect x="152" y="374" width="208" height="16"
+        rx="8" ry="8"
+        fill="#ffffff" opacity="0.22"/>
+
+  <!-- ── Glanzreflexion oben-links ── -->
+  <ellipse cx="215" cy="130" rx="42" ry="22"
+           fill="white" opacity="0.15"/>
+</svg>
