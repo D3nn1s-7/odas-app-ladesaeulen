@@ -167,13 +167,13 @@
     },
     "apiurl": {
       "label": "URL zu den Ladesäulen-Daten",
-      "hilfe": "API-Endpunkt des Ladesäulen-Datensatzes (OpenDataSoft records-Endpunkt)",
+      "hilfe": "API-Endpunkt des Ladesäulen-Datensatzes (OpenDataSoft records oder CKAN datastore_search/datastore_search_sql)",
       "format": {
         "typ": "url",
         "laenge": 255
       },
       "default": "https://opendata.rhein-kreis-neuss.de/api/explore/v2.1/catalog/datasets/rhein-kreis-neuss-ladesaulen-in-deutschland/records",
-      "beispiel": "https://opendata.rhein-kreis-neuss.de/api/explore/v2.1/catalog/datasets/rhein-kreis-neuss-ladesaulen-in-deutschland/records",
+      "beispiel": "https://opendata.rhein-kreis-neuss.de/api/explore/v2.1/catalog/datasets/rhein-kreis-neuss-ladesaulen-in-deutschland/records oder https://<portal>/api/3/action/datastore_search?resource_id=<resource-id>",
       "erforderlich": "ja"
     },
     "sprache": {

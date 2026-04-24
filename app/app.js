@@ -7,6 +7,10 @@
  *   {
  *     "apiurl": "https://opendata.rhein-kreis-neuss.de/api/explore/v2.1/catalog/datasets/rhein-kreis-neuss-ladesaulen-in-deutschland/records"
  *   }
+ *   oder
+ *   {
+ *     "apiurl": "https://<portal>/api/3/action/datastore_search?resource_id=<resource-id>"
+ *   }
  *
  * @param {Object} configdata
  * @param enclosingHtmlDivElement
@@ -158,6 +162,72 @@ function initMap(el, BASE_URL) {
   let geladenerOrt = null; // Anzeigewert im Input (Ortsname)
   let geladenerSuchWert = null; // tatsächlich verwendeter API-Suchwert (PLZ oder Ort)
   let markers = [];
+  const apiType = detectApiType(BASE_URL);
+
+  function detectApiType(url) {
+    const lower = String(url || "").toLowerCase();
+    if (lower.includes("/api/3/action/")) return "ckan";
+    return "ods-v2";
+  }
+
+  function escapeSqlString(value) {
+    return String(value || "").replace(/'/g, "''");
+  }
+
+  function buildUrlWithParams(baseUrl, paramsToSet = {}) {
+    const [base, query = ""] = String(baseUrl || "").split("?");
+    const params = new URLSearchParams(query);
+    Object.entries(paramsToSet).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === "") {
+        params.delete(key);
+      } else {
+        params.set(key, String(value));
+      }
+    });
+    const qs = params.toString();
+    return qs ? `${base}?${qs}` : base;
+  }
+
+  function getUrlOrigin(url) {
+    const m = String(url || "").match(/^https?:\/\/[^/]+/i);
+    return m ? m[0] : "";
+  }
+
+  function getCkanResourceId(url) {
+    const [, query = ""] = String(url || "").split("?");
+    const params = new URLSearchParams(query);
+    return params.get("resource_id") || null;
+  }
+
+  function getCkanSqlEndpoint(url) {
+    const base = String(url || "").split("?")[0];
+    if (base.includes("/api/3/action/datastore_search_sql")) return base;
+    if (base.includes("/api/3/action/datastore_search")) {
+      return base.replace(
+        "/api/3/action/datastore_search",
+        "/api/3/action/datastore_search_sql",
+      );
+    }
+    const origin = getUrlOrigin(url);
+    return origin
+      ? `${origin}/api/3/action/datastore_search_sql`
+      : "/api/3/action/datastore_search_sql";
+  }
+
+  function getCkanSearchEndpoint(url) {
+    const base = String(url || "").split("?")[0];
+    if (base.includes("/api/3/action/datastore_search")) return base;
+    if (base.includes("/api/3/action/datastore_search_sql")) {
+      return base.replace(
+        "/api/3/action/datastore_search_sql",
+        "/api/3/action/datastore_search",
+      );
+    }
+    const origin = getUrlOrigin(url);
+    return origin
+      ? `${origin}/api/3/action/datastore_search`
+      : "/api/3/action/datastore_search";
+  }
 
   /* ── Icons ── */
   function makeIcon(schnell) {
@@ -219,10 +289,71 @@ function initMap(el, BASE_URL) {
   }
 
   /* ── Koordinaten normalisieren und auf Deutschland-Bounding-Box prüfen ── */
-  function getCoord(coord) {
-    if (!coord) return null;
-    let { lat, lon } = coord;
-    if (!lat || !lon) return null;
+  function getCoord(source) {
+    const rec = source && typeof source === "object" ? source : null;
+    let coord = rec && "koordinaten" in rec ? rec.koordinaten : source;
+    let lat = null;
+    let lon = null;
+
+    const toNum = (v) => {
+      if (v === null || v === undefined) return null;
+      const n = Number(String(v).replace(",", "."));
+      return Number.isFinite(n) ? n : null;
+    };
+
+    if (typeof coord === "string") {
+      const trimmed = coord.trim();
+      if (trimmed.startsWith("{")) {
+        try {
+          coord = JSON.parse(trimmed);
+        } catch {
+          coord = null;
+        }
+      } else if (trimmed.includes(",")) {
+        const parts = trimmed.split(",").map((p) => toNum(p.trim()));
+        if (parts.length >= 2 && parts[0] !== null && parts[1] !== null) {
+          lat = parts[0];
+          lon = parts[1];
+        }
+      }
+    }
+
+    if (coord && typeof coord === "object") {
+      lat =
+        lat ??
+        toNum(coord.lat ?? coord.latitude ?? coord.y ?? coord[1] ?? null);
+      lon =
+        lon ??
+        toNum(
+          coord.lon ??
+            coord.lng ??
+            coord.longitude ??
+            coord.x ??
+            coord[0] ??
+            null,
+        );
+    }
+
+    if (rec) {
+      lat =
+        lat ??
+        toNum(
+          rec.breitengrad ?? rec.latitude ?? rec.lat ?? rec.y_koord ?? null,
+        );
+      lon =
+        lon ??
+        toNum(
+          rec.laengengrad ??
+            rec.längengrad ??
+            rec.longitude ??
+            rec.lon ??
+            rec.lng ??
+            rec.x_koord ??
+            null,
+        );
+    }
+
+    if (lat === null || lon === null) return null;
     // Vertauschte lat/lon erkennen und korrigieren
     if (lat >= 5.8 && lat <= 15.1 && lon >= 47.2 && lon <= 55.1) {
       [lat, lon] = [lon, lat];
@@ -282,9 +413,7 @@ function initMap(el, BASE_URL) {
 
   /* ── Geografische Ausreißer erkennen und per Geocoding korrigieren ── */
   async function fixOutliers(stationen) {
-    const coords = stationen
-      .map((s) => getCoord(s.koordinaten))
-      .filter(Boolean);
+    const coords = stationen.map((s) => getCoord(s)).filter(Boolean);
     if (coords.length < 3) return stationen;
 
     const lats = coords.map((c) => c.lat).sort((a, b) => a - b);
@@ -295,7 +424,7 @@ function initMap(el, BASE_URL) {
 
     const result = [];
     for (const s of stationen) {
-      const c = getCoord(s.koordinaten);
+      const c = getCoord(s);
       if (!c) continue;
       const dist = haversine(c.lat, c.lon, medLat, medLon);
       if (dist <= maxKm) {
@@ -318,7 +447,7 @@ function initMap(el, BASE_URL) {
     markerGroup.clearLayers();
     markers = [];
     stationen.forEach((s, i) => {
-      const coord = getCoord(s.koordinaten);
+      const coord = getCoord(s);
       if (!coord) return;
       const schnell = istSchnell(s);
       const marker = L.marker([coord.lat, coord.lon], {
@@ -370,7 +499,7 @@ function initMap(el, BASE_URL) {
 
     if (stationen.length > 0) {
       const coords = stationen
-        .map((s) => getCoord(s.koordinaten))
+        .map((s) => getCoord(s))
         .filter(Boolean)
         .map((c) => [c.lat, c.lon]);
       if (coords.length > 0)
@@ -453,7 +582,7 @@ function initMap(el, BASE_URL) {
           const schnell = istSchnell(s);
           const adresse = [s.strasse, s.hausnummer].filter(Boolean).join(" ");
           const ort = [s.postleitzahl, s.ort].filter(Boolean).join(" ");
-          const c = getCoord(s.koordinaten);
+          const c = getCoord(s);
           const hasCoord = !!c;
           return `<tr style="cursor:${hasCoord ? "pointer" : "default"}"
                     data-lat="${c?.lat || ""}"
@@ -613,32 +742,33 @@ function initMap(el, BASE_URL) {
 
     // WHERE-Klausel — nur Ort/PLZ serverseitig filtern; Stecker wird clientseitig gefiltert
     const conditions = [];
+    const suchText = (suchWert || "").trim();
+    const istPlz = /^\d{4,5}$/.test(suchText);
 
-    if (suchWert) {
-      const istPlz = /^\d{4,5}$/.test(suchWert.trim());
+    if (suchText) {
       if (istPlz) {
-        conditions.push(`postleitzahl LIKE '${suchWert.trim()}%'`);
+        conditions.push(`postleitzahl LIKE '${suchText}%'`);
       } else {
-        conditions.push(`ort LIKE '%${suchWert.trim()}%'`);
+        conditions.push(`ort LIKE '%${suchText}%'`);
       }
     }
 
     const where = conditions.length > 0 ? conditions.join(" AND ") : null;
 
-    async function fetchAllPages() {
+    async function fetchAllPagesOds() {
       const PAGE_SIZE = 100;
       let offset = 0;
       let total = null;
       let allResults = [];
 
       while (true) {
-        const params = new URLSearchParams({
-          limit: String(PAGE_SIZE),
-          offset: String(offset),
+        const reqUrl = buildUrlWithParams(BASE_URL, {
+          limit: PAGE_SIZE,
+          offset,
+          where,
         });
-        if (where) params.set("where", where);
 
-        const res = await fetch(`${BASE_URL}?${params.toString()}`);
+        const res = await fetch(reqUrl);
         if (!res.ok) throw new Error("API-Fehler: " + res.status);
         const data = await res.json();
 
@@ -658,9 +788,68 @@ function initMap(el, BASE_URL) {
       return allResults;
     }
 
+    async function fetchAllPagesCkan() {
+      const PAGE_SIZE = 100;
+      let offset = 0;
+      let total = null;
+      let allResults = [];
+      const resourceId = getCkanResourceId(BASE_URL);
+
+      while (true) {
+        let reqUrl;
+        if (resourceId) {
+          const sqlWhere = !suchText
+            ? ""
+            : istPlz
+              ? ` WHERE CAST(postleitzahl AS TEXT) LIKE '${escapeSqlString(suchText)}%'`
+              : ` WHERE CAST(ort AS TEXT) ILIKE '%${escapeSqlString(suchText)}%'`;
+          const sql = `SELECT * FROM "${resourceId}"${sqlWhere} LIMIT ${PAGE_SIZE} OFFSET ${offset}`;
+          reqUrl = buildUrlWithParams(getCkanSqlEndpoint(BASE_URL), { sql });
+        } else {
+          reqUrl = buildUrlWithParams(BASE_URL, {
+            limit: PAGE_SIZE,
+            offset,
+            q: suchText || null,
+          });
+          if (!reqUrl.includes("/api/3/action/datastore_search")) {
+            reqUrl = buildUrlWithParams(getCkanSearchEndpoint(BASE_URL), {
+              limit: PAGE_SIZE,
+              offset,
+              q: suchText || null,
+            });
+          }
+        }
+
+        const res = await fetch(reqUrl);
+        if (!res.ok) throw new Error("API-Fehler: " + res.status);
+        const data = await res.json();
+        if (data && data.success === false) {
+          throw new Error(data.error?.message || "CKAN API-Fehler");
+        }
+
+        const page = data?.result?.records || [];
+        if (total === null) total = data?.result?.total ?? 0;
+        allResults = allResults.concat(page);
+
+        if (total > PAGE_SIZE) {
+          const p = listEl.querySelector("p");
+          if (p) p.textContent = `Lade Daten… ${allResults.length} / ${total}`;
+        }
+
+        if (page.length < PAGE_SIZE || allResults.length >= total) break;
+        offset += PAGE_SIZE;
+      }
+      return allResults;
+    }
+
+    async function fetchAllPages() {
+      if (apiType === "ckan") return fetchAllPagesCkan();
+      return fetchAllPagesOds();
+    }
+
     fetchAllPages()
       .then(async (results) => {
-        const valid = results.filter((s) => !!getCoord(s.koordinaten));
+        const valid = results.filter((s) => !!getCoord(s));
 
         // Ladetext während Geocoding aktualisieren
         const p = listEl.querySelector("p");
